@@ -166,23 +166,20 @@
 </head>
 <body>
 
-    <!-- Area Sentuh untuk Mobile -->
     <div id="touch-left"></div>
     <div id="touch-right"></div>
 
-    <!-- Main Menu (Showroom Transparan) -->
+    <!-- Main Menu -->
     <div id="main-menu" class="overlay menu-bg">
         <div class="menu-header">
             <h1>CRYPTO RACER JAY</h1>
             <p class="subtitle">SURVIVE. MINE DISTANCE.</p>
         </div>
-        
         <div class="menu-bottom">
-            <!-- UI Pilihan Mobil -->
             <div id="car-selector">
-                <button id="btn-prev-car" class="car-btn">â—„</button>
+                <button id="btn-prev-car" class="car-btn">◄</button>
                 <div id="selected-car-name">SEDAN SPORTS</div>
-                <button id="btn-next-car" class="car-btn">â–º</button>
+                <button id="btn-next-car" class="car-btn">►</button>
             </div>
             <button id="start-btn" class="btn-main">START ENGINE</button>
         </div>
@@ -201,11 +198,11 @@
         <div class="hud-stat"><span class="stat-label">SPEED</span> <span id="val-speed">0</span> KM/H</div>
     </div>
 
-    <!-- In-Game Instructions -->
+    <!-- Instructions -->
     <div id="in-game-instructions">
         <h3>HOW TO PLAY</h3>
-        <p>ðŸ“± <b>TAP </b> Left/Right</p>
-        <p>ðŸ’» <b>ARROW KEYS</b> or <b>A / D</b></p>
+        <p>📱 <b>TAP </b> Left/Right</p>
+        <p>💻 <b>ARROW KEYS</b> or <b>A / D</b></p>
         <p class="alert-text">AVOID THE TRAFFIC!</p>
     </div>
 
@@ -215,7 +212,6 @@
         import * as THREE from 'three';
         import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-        // --- GAME STATE & CONSTANTS ---
         const gameState = {
             isRunning: false,
             score: 0,
@@ -232,14 +228,13 @@
         const elScore = document.getElementById('val-score');
         const elSpeed = document.getElementById('val-speed');
 
-        // --- THREE.JS SETUP ---
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x4fc3f7); 
         scene.fog = new THREE.Fog(0x4fc3f7, 30, 150); 
 
         const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 200);
         camera.position.set(0, 3, 7); 
-        camera.lookAt(0, 1, 0); // Di awal (menu), fokus ke mobil
+        camera.lookAt(0, 1, 0);
 
         const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
         renderer.setSize(window.innerWidth, window.innerHeight);
@@ -248,7 +243,6 @@
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         document.getElementById('game-container').appendChild(renderer.domElement);
 
-        // --- LIGHTING ---
         scene.add(new THREE.AmbientLight(0xffffff, 0.7));
         
         const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
@@ -256,15 +250,8 @@
         dirLight.castShadow = true;
         dirLight.shadow.mapSize.width = 512;
         dirLight.shadow.mapSize.height = 512;
-        dirLight.shadow.camera.near = 0.5;
-        dirLight.shadow.camera.far = 100;
-        dirLight.shadow.camera.left = -20;
-        dirLight.shadow.camera.right = 20;
-        dirLight.shadow.camera.top = 20;
-        dirLight.shadow.camera.bottom = -60;
         scene.add(dirLight);
 
-        // --- CACHE & MATERIALS ---
         const CACHE = {
             geo: {
                 carHitbox: new THREE.BoxGeometry(1.6, 1.2, 3.5), 
@@ -279,8 +266,6 @@
                 road: new THREE.MeshStandardMaterial({ color: 0x444444, roughness: 0.8 }),
                 grass: new THREE.MeshStandardMaterial({ color: 0x7cb342, roughness: 1.0 }),
                 stripe: new THREE.MeshBasicMaterial({ color: 0xffffff }),
-                playerFallback: new THREE.MeshStandardMaterial({ color: 0x00d2ff }), 
-                enemyFallback: new THREE.MeshStandardMaterial({ color: 0xff3366 }),  
                 wood: new THREE.MeshStandardMaterial({ color: 0x5d4037 }),
                 leaf: new THREE.MeshStandardMaterial({ color: 0x2e7d32 })
             }
@@ -288,35 +273,82 @@
 
         const loader = new GLTFLoader();
 
-        // --- PLAYER CAR GROUP SETUP ---
+        // ==========================================
+        // 1. SISTEM ANTREAN LOAD (MENCEGAH CRASH OOM)
+        // ==========================================
+        const loadQueue = [];
+        let isLoadingAsset = false;
+
+        function processQueue() {
+            if (loadQueue.length === 0) {
+                isLoadingAsset = false;
+                return;
+            }
+            isLoadingAsset = true;
+            const task = loadQueue.shift();
+
+            loader.load(
+                task.file, 
+                (gltf) => {
+                    task.onSuccess(gltf);
+                    processQueue(); // Lanjut ke antrean berikutnya setelah sukses
+                },
+                undefined,
+                (err) => {
+                    console.warn(`Fallback procedural digunakan untuk ${task.file}`);
+                    processQueue(); // Lanjut meskipun gagal
+                }
+            );
+        }
+
+        function queueGltfLoad(file, onSuccess) {
+            loadQueue.push({ file, onSuccess });
+            if (!isLoadingAsset) processQueue();
+        }
+
+        function buildProceduralCar(colorHex) {
+            const group = new THREE.Group();
+            const bodyMat = new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.5 });
+            const glassMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.1 });
+            const wheelMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.9 });
+
+            const body = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.6, 3.4), bodyMat);
+            body.position.y = 0.5; body.castShadow = true; body.receiveShadow = true;
+            group.add(body);
+
+            const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.5, 1.8), glassMat);
+            cabin.position.set(0, 1.0, -0.2); cabin.castShadow = true; cabin.receiveShadow = true;
+            group.add(cabin);
+
+            const wheelGeo = new THREE.CylinderGeometry(0.35, 0.35, 0.4, 16);
+            wheelGeo.rotateZ(Math.PI / 2);
+            [[-0.8, 0.35, 1.0], [0.8, 0.35, 1.0], [-0.8, 0.35, -1.0], [0.8, 0.35, -1.0]].forEach(pos => {
+                const wheel = new THREE.Mesh(wheelGeo, wheelMat);
+                wheel.position.set(...pos); wheel.castShadow = true;
+                group.add(wheel);
+            });
+            return group;
+        }
+
         const playerCar = new THREE.Group();
-        
         const pBody = new THREE.Mesh(CACHE.geo.carHitbox, CACHE.mat.invisible);
         pBody.position.y = 0.6;
         playerCar.add(pBody);
         
         const playerVisuals = new THREE.Group();
         playerCar.add(playerVisuals);
-
-        const playerPlaceholder = new THREE.Mesh(CACHE.geo.carHitbox, CACHE.mat.playerFallback);
-        playerPlaceholder.position.y = 0.6;
-        playerPlaceholder.castShadow = true;
-        playerVisuals.add(playerPlaceholder);
-        
         scene.add(playerCar);
         const playerBox = new THREE.Box3();
 
-        // --- CAR SELECTION SYSTEM ---
         const selectableCars = [
-            { name: "SEDAN SPORTS", file: "sedan-sports.glb" },
-            { name: "LUXURY SUV", file: "suv-luxury.glb" },
-            { name: "TAXI CAB", file: "taxi.glb" },
-            { name: "POLICE CRUISER", file: "police.glb" },
-            { name: "FLATBED TRUCK", file: "truck-flat.glb" }
+            { name: "SEDAN SPORTS", file: "sedan-sports.glb", color: 0x00d2ff },
+            { name: "LUXURY SUV", file: "suv-luxury.glb", color: 0x888888 },
+            { name: "TAXI CAB", file: "taxi.glb", color: 0xffcc00 },
+            { name: "POLICE CRUISER", file: "police.glb", color: 0x0022ff },
+            { name: "FLATBED TRUCK", file: "truck-flat.glb", color: 0x229922 }
         ];
         const preloadedPlayerCars = {};
         let selectedCarIndex = 0;
-
         const elSelectedCarName = document.getElementById('selected-car-name');
 
         function updateMenuCarModel() {
@@ -324,8 +356,6 @@
             const selectedFileName = selectableCars[selectedCarIndex].file;
             if (preloadedPlayerCars[selectedFileName]) {
                 playerVisuals.add(preloadedPlayerCars[selectedFileName].clone());
-            } else {
-                playerVisuals.add(playerPlaceholder);
             }
         }
 
@@ -334,95 +364,77 @@
             elSelectedCarName.innerText = selectableCars[selectedCarIndex].name;
             updateMenuCarModel();
         });
-        
         document.getElementById('btn-next-car').addEventListener('click', () => {
             selectedCarIndex = (selectedCarIndex + 1) % selectableCars.length;
             elSelectedCarName.innerText = selectableCars[selectedCarIndex].name;
             updateMenuCarModel();
         });
 
-        // Preload mobil pilihan
         selectableCars.forEach(car => {
-            loader.load(car.file, (gltf) => {
+            preloadedPlayerCars[car.file] = buildProceduralCar(car.color);
+            if (selectableCars[selectedCarIndex].file === car.file) updateMenuCarModel();
+
+            // Gunakan Queue Loader agar tidak membuat GPU kewalahan
+            queueGltfLoad(car.file, (gltf) => {
                 const model = gltf.scene;
                 model.scale.set(1.5, 1.5, 1.5); 
                 model.rotation.y = Math.PI;     
                 model.traverse((child) => {
-                    if (child.isMesh) {
-                        child.castShadow = true;
-                        child.receiveShadow = true;
-                    }
+                    if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; }
                 });
                 preloadedPlayerCars[car.file] = model;
-
-                // Jika model yg diload adalah mobil yg aktif dipilih, perbarui tampilan
-                if (selectableCars[selectedCarIndex].file === car.file) {
-                    updateMenuCarModel();
-                }
+                if (selectableCars[selectedCarIndex].file === car.file) updateMenuCarModel();
             });
         });
 
-        // --- ENVIRONMENT SETUP ---
         const grass = new THREE.Mesh(CACHE.geo.grass, CACHE.mat.grass);
-        grass.rotation.x = -Math.PI / 2;
-        grass.position.z = -100;
-        grass.receiveShadow = true;
+        grass.rotation.x = -Math.PI / 2; grass.position.z = -100; grass.receiveShadow = true;
         scene.add(grass);
 
         const road = new THREE.Mesh(CACHE.geo.road, CACHE.mat.road);
-        road.rotation.x = -Math.PI / 2;
-        road.position.set(0, 0.01, -100);
-        road.receiveShadow = true;
+        road.rotation.x = -Math.PI / 2; road.position.set(0, 0.01, -100); road.receiveShadow = true;
         scene.add(road);
 
         const stripes = [];
         for (let i = 0; i < 20; i++) {
             const stripe = new THREE.Mesh(CACHE.geo.stripe, CACHE.mat.stripe);
-            stripe.rotation.x = -Math.PI / 2;
-            stripe.position.set(0, 0.02, -i * 10);
-            scene.add(stripe);
-            stripes.push(stripe);
+            stripe.rotation.x = -Math.PI / 2; stripe.position.set(0, 0.02, -i * 10);
+            scene.add(stripe); stripes.push(stripe);
         }
 
-        // --- TREES SETUP ---
         const trees = [];
-        const treePlaceholderGroup = new THREE.Group();
+        const treeProceduralGroup = new THREE.Group();
         const trunkMesh = new THREE.Mesh(CACHE.geo.treeTrunk, CACHE.mat.wood);
-        trunkMesh.position.y = 1;
-        trunkMesh.castShadow = true;
+        trunkMesh.position.y = 1; trunkMesh.castShadow = true;
         const leavesMesh = new THREE.Mesh(CACHE.geo.treeLeaves, CACHE.mat.leaf);
-        leavesMesh.position.y = 3;
-        leavesMesh.castShadow = true;
-        treePlaceholderGroup.add(trunkMesh, leavesMesh);
+        leavesMesh.position.y = 3; leavesMesh.castShadow = true;
+        treeProceduralGroup.add(trunkMesh, leavesMesh);
 
         for (let i = 0; i < 30; i++) {
             const treeGroup = new THREE.Group();
             const zPos = -Math.random() * 200;
             const xPos = (Math.random() > 0.5 ? 1 : -1) * (12 + Math.random() * 15);
             treeGroup.position.set(xPos, 0, zPos);
-            treeGroup.add(treePlaceholderGroup.clone());
+            treeGroup.add(treeProceduralGroup.clone());
             scene.add(treeGroup);
             trees.push(treeGroup);
         }
 
-        loader.load('tree.glb', (gltf) => {
+        queueGltfLoad('tree.glb', (gltf) => {
             const treeTemplate = gltf.scene;
             treeTemplate.scale.set(1.5, 1.5, 1.5);
             treeTemplate.traverse((child) => {
-                if (child.isMesh) {
-                    child.castShadow = true;
-                    child.receiveShadow = true;
-                }
+                if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; }
             });
-            trees.forEach(t => {
-                t.clear();
-                t.add(treeTemplate.clone());
-            });
+            trees.forEach(t => { t.clear(); t.add(treeTemplate.clone()); });
         });
 
-        // --- TRAFFIC (ENEMIES) ---
         const traffic = [];
-        const loadedTrafficModels = [];
+        const loadedTrafficModels = [
+            buildProceduralCar(0xff3366), buildProceduralCar(0xff9900),
+            buildProceduralCar(0x33cc33), buildProceduralCar(0xcc33cc) 
+        ];
+
         const trafficFiles = [
             'van.glb', 'taxi.glb', 'police.glb', 'truck.glb', 'suv.glb', 
             'delivery-flat.glb', 'ambulance.glb', 'delivery.glb', 
@@ -431,15 +443,12 @@
         ];
         
         trafficFiles.forEach(file => {
-            loader.load(file, (gltf) => {
+            queueGltfLoad(file, (gltf) => {
                 const model = gltf.scene;
                 model.scale.set(1.5, 1.5, 1.5);
                 model.rotation.y = Math.PI; 
                 model.traverse((child) => {
-                    if (child.isMesh) {
-                        child.castShadow = true;
-                        child.receiveShadow = true;
-                    }
+                    if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; }
                 });
                 loadedTrafficModels.push(model);
             });
@@ -447,36 +456,23 @@
 
         function spawnTrafficCar() {
             const tCar = new THREE.Group();
-            
             const hitbox = new THREE.Mesh(CACHE.geo.carHitbox, CACHE.mat.invisible);
             hitbox.position.y = 0.6;
             tCar.add(hitbox);
 
             const visualContainer = new THREE.Group();
-            const enemyPlaceholder = new THREE.Mesh(CACHE.geo.carHitbox, CACHE.mat.enemyFallback);
-            enemyPlaceholder.position.y = 0.6;
-            enemyPlaceholder.castShadow = true;
-            visualContainer.add(enemyPlaceholder);
+            const randomModel = loadedTrafficModels[Math.floor(Math.random() * loadedTrafficModels.length)].clone();
+            visualContainer.add(randomModel);
             tCar.add(visualContainer);
 
-            // Simpan musuh jauh ke depan agar tidak menumpuk dengan player saat di menu
-            const randomLane = (Math.random() * (gameState.laneLimits * 2)) - gameState.laneLimits;
-            tCar.position.set(randomLane, 0, -150 - (Math.random() * 50));
-            
-            tCar.userData = {
-                speed: 30 + Math.random() * 20, 
-                box: new THREE.Box3(),
-                visualAttached: false
-            };
+            tCar.position.set((Math.random() * (gameState.laneLimits * 2)) - gameState.laneLimits, 0, -150 - (Math.random() * 50));
+            tCar.userData = { speed: 30 + Math.random() * 20, box: new THREE.Box3() };
 
             scene.add(tCar);
             traffic.push(tCar);
         }
-
         for(let i=0; i<6; i++) spawnTrafficCar();
 
-
-        // --- INPUT CONTROLS ---
         window.addEventListener('keydown', (e) => {
             if (e.key === 'ArrowLeft' || e.key === 'a') input.left = true;
             if (e.key === 'ArrowRight' || e.key === 'd') input.right = true;
@@ -490,12 +486,10 @@
             const zone = document.getElementById(id);
             const press = (e) => { e.preventDefault(); input[key] = true; };
             const release = (e) => { e.preventDefault(); input[key] = false; };
-
             zone.addEventListener('touchstart', press, { passive: false });
             zone.addEventListener('touchend', release, { passive: false });
             zone.addEventListener('touchcancel', release, { passive: false });
         };
-
         setupTouchZone('touch-left', 'left');
         setupTouchZone('touch-right', 'right');
 
@@ -505,15 +499,16 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
 
-        // --- MAIN GAME LOOP ---
         const clock = new THREE.Clock();
+        
+        // 2. OPTIMASI MEMORI DALAM LOOP: Cukup gunakan 1 variabel Vector3 secara global
+        const tempSize = new THREE.Vector3();
 
         function animate() {
             requestAnimationFrame(animate);
             const delta = Math.min(clock.getDelta(), 0.1); 
 
             if (gameState.isRunning) {
-                // GAME LOGIC
                 if (gameState.speed < gameState.maxSpeed) {
                     gameState.speed += gameState.acceleration * delta;
                     gameState.speed = Math.min(gameState.speed, gameState.maxSpeed);
@@ -525,19 +520,20 @@
 
                 let steerAngle = 0;
                 if (input.left && playerCar.position.x > -gameState.laneLimits) {
-                    playerCar.position.x -= gameState.steeringSpeed * delta;
-                    steerAngle = 0.2; 
+                    playerCar.position.x -= gameState.steeringSpeed * delta; steerAngle = 0.2; 
                 }
                 if (input.right && playerCar.position.x < gameState.laneLimits) {
-                    playerCar.position.x += gameState.steeringSpeed * delta;
-                    steerAngle = -0.2;
+                    playerCar.position.x += gameState.steeringSpeed * delta; steerAngle = -0.2;
                 }
                 
                 playerCar.rotation.z = THREE.MathUtils.lerp(playerCar.rotation.z, steerAngle, delta * 12);
                 playerCar.rotation.y = THREE.MathUtils.lerp(playerCar.rotation.y, steerAngle * 1.5, delta * 12);
 
                 playerBox.setFromObject(playerCar);
-                playerBox.expandByVector(playerBox.getSize(new THREE.Vector3()).multiplyScalar(-0.1)); 
+                if (!playerBox.isEmpty()) {
+                    playerBox.getSize(tempSize);
+                    playerBox.expandByVector(tempSize.multiplyScalar(-0.1)); 
+                }
 
                 const moveDist = gameState.speed * delta;
 
@@ -556,19 +552,14 @@
 
                 for (let i = 0; i < traffic.length; i++) {
                     const tCar = traffic[i];
-                    
-                    if (!tCar.userData.visualAttached && loadedTrafficModels.length > 0) {
-                        tCar.children[1].clear(); 
-                        const randomModel = loadedTrafficModels[Math.floor(Math.random() * loadedTrafficModels.length)].clone();
-                        tCar.children[1].add(randomModel);
-                        tCar.userData.visualAttached = true;
-                    }
-
                     const relativeSpeed = gameState.speed - tCar.userData.speed;
                     tCar.position.z += relativeSpeed * delta;
 
                     tCar.userData.box.setFromObject(tCar);
-                    tCar.userData.box.expandByVector(tCar.userData.box.getSize(new THREE.Vector3()).multiplyScalar(-0.15));
+                    if (!tCar.userData.box.isEmpty()) {
+                        tCar.userData.box.getSize(tempSize);
+                        tCar.userData.box.expandByVector(tempSize.multiplyScalar(-0.15));
+                    }
 
                     if (playerBox.intersectsBox(tCar.userData.box)) {
                         triggerGameOver();
@@ -580,35 +571,25 @@
                         tCar.position.x = (Math.random() * (gameState.laneLimits * 2)) - gameState.laneLimits;
                         tCar.userData.speed = 30 + Math.random() * 20; 
                         
-                        if (loadedTrafficModels.length > 0) {
-                            tCar.children[1].clear(); 
-                            const newModel = loadedTrafficModels[Math.floor(Math.random() * loadedTrafficModels.length)].clone();
-                            tCar.children[1].add(newModel);
-                        }
+                        tCar.children[1].clear(); 
+                        const newModel = loadedTrafficModels[Math.floor(Math.random() * loadedTrafficModels.length)].clone();
+                        tCar.children[1].add(newModel);
                     }
                 }
                 
-                // PENGATURAN KAMERA DALAM GAME
                 const targetCamX = playerCar.position.x * 0.75; 
                 camera.position.x = THREE.MathUtils.lerp(camera.position.x, targetCamX, delta * 4);
+                camera.lookAt(THREE.MathUtils.lerp(0, playerCar.position.x, 0.4), 0, -20);
                 
-                const lookAtX = THREE.MathUtils.lerp(0, playerCar.position.x, 0.4);
-                camera.lookAt(lookAtX, 0, -20);
-                
-                // Getaran (Shake) dikurangi
                 const shake = (gameState.speed / gameState.maxSpeed) * 0.015; 
                 camera.position.y = 4 + Math.cos(clock.elapsedTime * 15) * shake;
                 camera.position.x += Math.sin(clock.elapsedTime * 20) * shake;
 
             } else {
-                // ANIMASI SHOWROOM MENU (Saat Game Berhenti / Game Over / Main Menu)
-                playerCar.rotation.y += delta * 0.5; // Putar mobil secara perlahan
-                
-                // Dekatkan kamera agar mobil telihat jelas & mempesona
+                playerCar.rotation.y += delta * 0.5; 
                 camera.position.lerp(new THREE.Vector3(0, 3, 7), delta * 2);
                 camera.lookAt(0, 1, 0);
 
-                // Buat lingkungan berjalan lambat di background menu
                 const menuMoveDist = 15 * delta;
                 stripes.forEach(stripe => {
                     stripe.position.z += menuMoveDist;
@@ -626,44 +607,34 @@
             renderer.render(scene, camera);
         }
 
-        // --- GAME FLOW ---
         function triggerGameOver() {
             gameState.isRunning = false;
             document.getElementById('hud').style.display = 'none';
             document.getElementById('touch-left').style.display = 'none';
             document.getElementById('touch-right').style.display = 'none';
             
-            // Tengahkan mobil kembali saat tertabrak agar pas di menu Showroom selanjutnya
             playerCar.position.set(0, 0, 0);
-
             document.getElementById('final-stats').innerText = `Distance Mined: ${Math.floor(gameState.score)} M`;
             document.getElementById('game-over').classList.remove('hidden');
         }
 
         function startGame() {
-            updateMenuCarModel(); // Pastikan visual mobil tepat sesuai yang dipilih
-
+            updateMenuCarModel(); 
             playerCar.position.set(0, 0, 0);
-            playerCar.rotation.set(0, 0, 0); // Kembalikan mobil ke arah depan
-            input.left = false;
-            input.right = false;
+            playerCar.rotation.set(0, 0, 0); 
+            input.left = false; input.right = false;
 
             traffic.forEach(tCar => {
                 tCar.position.z = -100 - (Math.random() * 150);
                 tCar.position.x = (Math.random() * (gameState.laneLimits * 2)) - gameState.laneLimits;
             });
 
-            gameState.score = 0;
-            gameState.speed = 40; 
-            gameState.isRunning = true;
-
-            elScore.innerText = "0";
-            elSpeed.innerText = "40";
+            gameState.score = 0; gameState.speed = 40; gameState.isRunning = true;
+            elScore.innerText = "0"; elSpeed.innerText = "40";
 
             document.getElementById('main-menu').classList.add('hidden');
             document.getElementById('game-over').classList.add('hidden');
             document.getElementById('hud').style.display = 'block';
-            
             document.getElementById('touch-left').style.display = 'block';
             document.getElementById('touch-right').style.display = 'block';
 
@@ -680,7 +651,6 @@
 
         document.getElementById('start-btn').addEventListener('click', startGame);
         document.getElementById('restart-btn').addEventListener('click', () => {
-            // Saat dari Game Over, kembali dulu ke Menu Utama (bukan langsung start)
             document.getElementById('game-over').classList.add('hidden');
             document.getElementById('main-menu').classList.remove('hidden');
         });
