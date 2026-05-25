@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+    <title>Retro Zombie City - Auto Aim</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
+        body { background: #030106; color: #fff; font-family: 'Courier New', Courier, monospace; overflow: hidden; display: flex; justify-content: center; align-items: center; height: 100vh; touch-action: none; }
+        #game-container { position: relative; box-shadow: 0 0 50px rgba(255, 0, 128, 0.2); width: 100vw; height: 100vh; max-width: 1200px; max-height: 800px; overflow: hidden; border: 4px solid #ff007f; }
+        canvas { display: block; background: #0c0214; width: 100%; height: 100%; }
+        
+        /* UI LAYOUTS - RETRO SYNTHWAVE STYLED */
+        #ui-top { position: absolute; top: 15px; left: 15px; display: flex; gap: 10px; z-index: 10; flex-wrap: wrap; pointer-events: none; }
+        .stat-box { background: rgba(12, 2, 20, 0.9); padding: 8px 15px; border-radius: 0px; border: 2px solid #3d0c5a; border-bottom: 4px solid #3d0c5a; font-weight: bold; display: flex; flex-direction: column; align-items: center; min-width: 85px; box-shadow: 0 4px 10px rgba(0,0,0,0.7); backdrop-filter: blur(5px); }
+        .stat-val { font-size: 20px; font-family: monospace; letter-spacing: 1px; font-weight: 900; }
+        .stat-label { font-size: 11px; color: #00ffff; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px; }
+        
+        /* Neon Themes */
+        #box-time { border-color: #00ffff; box-shadow: 0 0 10px rgba(0,255,255,0.3); }
+        #box-time .stat-val { color: #00ffff; text-shadow: 0 0 5px #00ffff; }
+        #box-wave { border-color: #ff007f; box-shadow: 0 0 10px rgba(255,0,127,0.3); }
+        #box-wave .stat-val { color: #ff007f; text-shadow: 0 0 5px #ff007f; }
+        #box-score { border-color: #ffff00; box-shadow: 0 0 10px rgba(255,255,0,0.3); }
+        #box-score .stat-val { color: #ffff00; text-shadow: 0 0 5px #ffff00; }
+        #box-hp { border-color: #39ff14; box-shadow: 0 0 10px rgba(57,255,20,0.3); }
+        #box-hp .stat-val { color: #39ff14; text-shadow: 0 0 5px #39ff14; }
+
+        /* UPGRADE NOTIF */
+        #upgrade-notif { position: absolute; top: 80px; left: 50%; transform: translateX(-50%); color: #ffff00; font-weight: bold; font-size: 18px; text-shadow: 0 0 10px #ffff00; pointer-events: none; opacity: 0; transition: opacity 0.3s; z-index: 50; font-family: 'Courier New', monospace; }
+
+        /* BUTTONS */
+        #btn-help { position: absolute; bottom: 20px; right: 20px; background: #0c0214; border: 2px solid #00ffff; color: #00ffff; padding: 10px 20px; font-weight: bold; border-radius: 0px; cursor: pointer; z-index: 50; transition: 0.2s; box-shadow: 0 0 10px rgba(0,255,255,0.3); }
+        #btn-help:hover { background: #00ffff; color: #0c0214; box-shadow: 0 0 20px #00ffff; }
+
+        /* MINIMAP */
+        #minimap-container { position: absolute; top: 15px; right: 15px; width: 130px; height: 130px; background: rgba(12, 2, 20, 0.9); border: 2px solid #ff007f; border-radius: 0px; overflow: hidden; z-index: 40; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.8); }
+        #minimapCanvas { width: 100%; height: 100%; display: block; }
+
+        /* RETRO VIGNETTE (Vaporwave Tint) */
+        #vignette { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; background: radial-gradient(circle, rgba(0,0,0,0) 30%, rgba(30,2,40,0.7) 100%); z-index: 5; }
+
+        /* PC CONTROLS HINT */
+        #controls-hint { position: absolute; bottom: 25px; left: 50%; transform: translateX(-50%); background: #0c0214; padding: 10px 25px; border-radius: 0px; font-size: 13px; text-align: center; pointer-events: none; white-space: nowrap; z-index: 10; border: 2px solid #3d0c5a; color: #ff007f; text-shadow: 0 0 2px #ff007f; }
+
+        /* MODAL */
+        #help-modal { display: flex; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(3,1,6,0.95); z-index: 200; justify-content: center; align-items: center; padding: 20px; }
+        .modal-content { background: #0c0214; border: 3px solid #ff007f; border-radius: 0px; padding: 30px; max-width: 500px; width: 100%; box-shadow: 0 0 30px rgba(255,0,127,0.5); }
+        .modal-content h2 { color: #00ffff; margin-bottom: 15px; text-align: center; text-shadow: 0 0 10px #00ffff; letter-spacing: 2px; }
+        .modal-content ul { margin: 15px 0; padding-left: 20px; line-height: 1.6; color: #ff007f; font-size: 14px; list-style-type: square; }
+        .modal-content b { color: #fff; text-shadow: 0 0 5px rgba(255,255,255,0.5); }
+        .modal-content button { background: #ff007f; color: #fff; border: none; padding: 12px; width: 100%; font-weight: bold; font-size: 16px; border-radius: 0px; cursor: pointer; margin-top: 15px; transition: 0.2s; text-shadow: 0 0 5px #fff; font-family: 'Courier New', monospace; }
+        .modal-content button:hover { background: #00ffff; color: #0c0214; box-shadow: 0 0 15px #00ffff; }
+
+        /* GAME OVER SCREEN */
+        #game-over { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #0c0214; padding: 40px; border-radius: 0px; text-align: center; border: 3px solid #ffff00; width: 90%; max-width: 400px; z-index: 100; box-shadow: 0 0 50px rgba(255, 255, 0, 0.4); }
+        #game-over h1 { color: #ffff00; margin-bottom: 15px; font-size: 38px; text-shadow: 0 0 10px #ffff00; letter-spacing: 3px; }
+        .go-stat { margin: 10px 0; font-size: 16px; color: #ff007f; display: flex; justify-content: space-between; border-bottom: 2px solid #3d0c5a; padding-bottom: 5px;}
+        .go-stat b { color: #fff; font-family: monospace; font-size: 20px; text-shadow: 0 0 5px #fff; }
+        #game-over button { background: #ffff00; color: #0c0214; border: none; padding: 15px; width: 100%; font-size: 16px; border-radius: 0px; cursor: pointer; margin-top: 25px; font-weight: bold; transition: 0.2s; font-family: 'Courier New', monospace; }
+        #game-over button:hover { background: #00ffff; box-shadow: 0 0 15px #00ffff; }
+
+        /* MOBILE CONTROLS */
+        #joystick-zone { display: none; position: absolute; bottom: 40px; left: 40px; width: 150px; height: 150px; background: rgba(0, 255, 255, 0.03); border: 2px dashed rgba(0, 255, 255, 0.3); border-radius: 50%; z-index: 20; }
+        #joystick-stick { position: absolute; top: 50px; left: 50px; width: 50px; height: 50px; background: rgba(255, 0, 127, 0.6); border: 2px solid #ff007f; border-radius: 50%; pointer-events: none; transition: transform 0.05s linear; box-shadow: 0 0 15px #ff007f; }
+
+        @media (max-width: 800px) or (pointer: coarse) {
+            #joystick-zone { display: block; }
+            #controls-hint { display: none; }
+            #btn-help { top: 155px; right: 15px; bottom: auto; padding: 8px 15px; font-size: 12px; }
+            #ui-top { max-width: calc(100% - 160px); }
+            .stat-box { min-width: 70px; padding: 5px 10px; }
+            .stat-val { font-size: 16px; }
+            .stat-label { font-size: 9px; }
+            #minimap-container { width: 100px; height: 100px; }
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+    <div id="vignette"></div>
+    
+    <div id="ui-top">
+        <div class="stat-box" id="box-time">
+            <div class="stat-label">TIME</div>
+            <div class="stat-val" id="time-val">00:00</div>
+        </div>
+        <div class="stat-box" id="box-wave">
+            <div class="stat-label">WAVE</div>
+            <div class="stat-val" id="wave-val">1</div>
+        </div>
+        <div class="stat-box" id="box-score">
+            <div class="stat-label">SCORE</div>
+            <div class="stat-val" id="score-val">0</div>
+        </div>
+        <div class="stat-box" id="box-hp">
+            <div class="stat-label">HP</div>
+            <div class="stat-val" id="hp-val">100</div>
+        </div>
+    </div>
+
+    <div id="upgrade-notif">FIRE RATE UPGRADED! ⚡</div>
+
+    <button id="btn-help" onclick="toggleHelp(true)">INFO</button>
+
+    <div id="minimap-container">
+        <canvas id="minimapCanvas" width="130" height="130"></canvas>
+    </div>
+
+    <div id="controls-hint">
+        Use <b>WASD</b> or <b>Arrows</b> to Move | Auto-Aim Enabled
+    </div>
+
+    <div id="joystick-zone">
+        <div id="joystick-stick"></div>
+    </div>
+
+    <div id="help-modal">
+        <div class="modal-content">
+            <h2>🧟 RAD CITY SURVIVAL</h2>
+            <hr style="border-color: #ff007f; margin-bottom: 10px;">
+            <ul>
+                <li><b>Auto-Aim:</b> Player automatically locks and shoots the nearest zombie.</li>
+                <li><b>Movement:</b> Use <b>WASD/Arrows</b> (PC) or <b>Joystick</b> (Mobile) to dodge.</li>
+                <li><b>Power-ups:</b> Grab blue neon crystals (⚡) for Fire Rate, and pink crosses (➕) for Health.</li>
+                <li><b>Enemies:</b> Watch out! Massive <b>TANK</b> giants spawn starting from Wave 2.</li>
+                <li><b>Objective:</b> Kill hordes, advance waves, and beat the high score.</li>
+            </ul>
+            <button onclick="toggleHelp(false)">LAUNCH SYSTEM</button>
+        </div>
+    </div>
+
+    <div id="game-over">
+        <h1>GAME OVER</h1>
+        <div class="go-stat">Time Alive <b id="final-time" style="color: #00ffff;">00:00</b></div>
+        <div class="go-stat">Wave Reached <b id="final-wave" style="color: #ff007f;">1</b></div>
+        <div class="go-stat">Score Cleared <b id="final-score" style="color: #ffff00;">0</b></div>
+        <button onclick="resetGame()">CONTINUE?</button>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const minimapCanvas = document.getElementById('minimapCanvas');
+    const mctx = minimapCanvas.getContext('2d');
+
+    function resizeCanvas() {
+        if(window.innerWidth <= 800) {
+            canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+        } else {
+            canvas.width = Math.min(window.innerWidth, 1200); canvas.height = Math.min(window.innerHeight, 800);
+        }
+    }
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+
+    let gameStarted = false;
+    function toggleHelp(show) { 
+        document.getElementById('help-modal').style.display = show ? 'flex' : 'none'; 
+        if (!show && !gameStarted && !isGameOver) {
+            gameStarted = true;
+            startTime = Date.now();
+            gameLoop();
+        }
+    }
+
+    // World Data
+    const blockSize = 300;  
+    const roadWidth = 200;  
+    const stepSize = blockSize + roadWidth; 
+    
+    // Game State
+    let keys = {};
+    let player;
+    let zombies = [];
+    let bullets = [];
+    let particles = [];
+    let upgradeItems = [];
+    let kills = 0;
+    let wave = 1;
+    let startTime = 0;
+    let survivalTime = 0; 
+    let isGameOver = false;
+    let camera = { x: 0, y: 0 };
+    let joystickData = { active: false, startX: 0, startY: 0, moveX: 0, moveY: 0 };
+    let gameLoopReq;
+
+    // Input Events PC
+    window.addEventListener('keydown', e => { keys[e.key.toLowerCase()] = true; });
+    window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+
+    // Input Events Mobile
+    const stick = document.getElementById('joystick-stick');
+    const zone = document.getElementById('joystick-zone');
+    zone.addEventListener('touchstart', e => {
+        e.preventDefault();
+        joystickData.active = true;
+        const rect = zone.getBoundingClientRect();
+        joystickData.startX = rect.left + rect.width / 2;
+        joystickData.startY = rect.top + rect.height / 2;
+    });
+    zone.addEventListener('touchmove', e => {
+        if (!joystickData.active) return;
+        e.preventDefault();
+        const touch = e.touches[0];
+        let dx = touch.clientX - joystickData.startX;
+        let dy = touch.clientY - joystickData.startY;
+        let dist = Math.hypot(dx, dy);
+        let maxRadius = 50;
+        if (dist > maxRadius) { dx = (dx / dist) * maxRadius; dy = (dy / dist) * maxRadius; }
+        stick.style.transform = `translate(${dx}px, ${dy}px)`;
+        joystickData.moveX = dx / maxRadius;
+        joystickData.moveY = dy / maxRadius;
+    });
+    function resetJoystick() { joystickData.active = false; joystickData.moveX = 0; joystickData.moveY = 0; stick.style.transform = `translate(0px, 0px)`; }
+    zone.addEventListener('touchend', resetJoystick);
+
+    // RETRO GRID MAP DRAWING
+    function drawInfiniteCity() {
+        let startGridX = Math.floor(camera.x / stepSize) * stepSize - stepSize;
+        let endGridX = startGridX + canvas.width + (stepSize * 2);
+        let startGridY = Math.floor(camera.y / stepSize) * stepSize - stepSize;
+        let endGridY = startGridY + canvas.height + (stepSize * 2);
+
+        // Dark Synth Floor
+        ctx.fillStyle = '#0a0314';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        for (let bx = startGridX; bx <= endGridX; bx += stepSize) {
+            for (let by = startGridY; by <= endGridY; by += stepSize) {
+                // Neon Grid Buildings Shadow
+                ctx.fillStyle = 'rgba(0,0,0,0.9)';
+                ctx.fillRect(bx - camera.x + 12, by - camera.y + 12, blockSize, blockSize);
+
+                // Synthwave Building Block Face
+                ctx.fillStyle = '#17052e';
+                ctx.fillRect(bx - camera.x, by - camera.y, blockSize, blockSize);
+                
+                // Glowing Cyber Borders
+                ctx.strokeStyle = '#3d0c5a';
+                ctx.lineWidth = 3;
+                ctx.strokeRect(bx - camera.x, by - camera.y, blockSize, blockSize);
+                
+                // Inner Cyber Roof Wireframe
+                ctx.strokeStyle = 'rgba(255, 0, 127, 0.25)';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(bx - camera.x + 20, by - camera.y + 20, blockSize - 40, blockSize - 40);
+
+                // Neon Road Markings (Cyan Retro Dashes)
+                ctx.fillStyle = '#00ffff';
+                if (by === startGridY) { 
+                    for(let i=0; i<blockSize; i+=50) { ctx.fillRect(bx - camera.x + blockSize + roadWidth/2 - 1, by - camera.y + i, 2, 25); }
+                }
+                if (bx === startGridX) { 
+                    for(let i=0; i<blockSize; i+=50) { ctx.fillRect(bx - camera.x + i, by - camera.y + blockSize + roadWidth/2 - 1, 25, 2); }
+                }
+            }
+        }
+    }
+
+    function isCollidingWithBuilding(objX, objY, radius) {
+        let baseGridX = Math.floor(objX / stepSize) * stepSize;
+        let baseGridY = Math.floor(objY / stepSize) * stepSize;
+        for (let offsetX = -stepSize; offsetX <= stepSize; offsetX += stepSize) {
+            for (let offsetY = -stepSize; offsetY <= stepSize; offsetY += stepSize) {
+                let bx = baseGridX + offsetX; let by = baseGridY + offsetY;
+                if (objX + radius > bx && objX - radius < bx + blockSize && objY + radius > by && objY - radius < by + blockSize) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    // RETRO PARTICLE EFFECTS
+    function createBlood(x, y) {
+        for(let i=0; i<8; i++) {
+            particles.push({
+                x: x, y: y,
+                vx: (Math.random() - 0.5) * 7, vy: (Math.random() - 0.5) * 7,
+                life: 25, color: '#ff007f', size: Math.random() * 3 + 2 // Pink Cyber Splatter
+            });
+        }
+    }
+    function createSparks(x, y, color) {
+        for(let i=0; i<6; i++) {
+            particles.push({
+                x: x, y: y,
+                vx: (Math.random() - 0.5) * 9, vy: (Math.random() - 0.5) * 9,
+                life: 18, color: color, size: Math.random() * 2 + 1
+            });
+        }
+    }
+    function showUpgradeText(text, color) {
+        let notif = document.getElementById('upgrade-notif');
+        notif.innerText = text;
+        notif.style.color = color || '#ffff00';
+        notif.style.textShadow = `0 0 10px ${color || '#ffff00'}`;
+        notif.style.opacity = 1;
+        notif.style.transform = 'translate(-50%, -10px)';
+        setTimeout(() => {
+            notif.style.opacity = 0;
+            notif.style.transform = 'translate(-50%, 0)';
+        }, 1500);
+    }
+
+    class Bullet {
+        constructor(x, y, angle) {
+            this.x = x; this.y = y; this.speed = 22;
+            this.vx = Math.cos(angle) * this.speed;
+            this.vy = Math.sin(angle) * this.speed;
+            this.life = 45;
+        }
+        update() {
+            this.x += this.vx; this.y += this.vy; this.life--;
+        }
+        draw() {
+            ctx.fillStyle = '#ffff00'; // Pure Neon Yellow Bullets
+            ctx.shadowBlur = 8; ctx.shadowColor = '#ffff00';
+            ctx.beginPath(); ctx.arc(this.x - camera.x, this.y - camera.y, 3, 0, Math.PI*2); ctx.fill();
+            ctx.shadowBlur = 0;
+        }
+    }
+
+    class UpgradeItem {
+        constructor(x, y, type) {
+            this.x = x; this.y = y; this.radius = 12;
+            this.floatOffset = Math.random() * Math.PI * 2;
+            this.type = type || (Math.random() < 0.5 ? 'WEAPON' : 'HEAL');
+        }
+        draw() {
+            let yOffset = Math.sin(Date.now() / 200 + this.floatOffset) * 5;
+            ctx.save();
+            
+            if (this.type === 'WEAPON') {
+                ctx.fillStyle = '#00ffff';
+                ctx.shadowBlur = 15; ctx.shadowColor = '#00ffff';
+                ctx.beginPath();
+                ctx.arc(this.x - camera.x, this.y - camera.y + yOffset, this.radius, 0, Math.PI*2);
+                ctx.fill();
+                ctx.fillStyle = '#0c0214'; ctx.shadowBlur = 0;
+                ctx.font = 'bold 12px monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText('PW', this.x - camera.x, this.y - camera.y + yOffset);
+            } else if (this.type === 'HEAL') {
+                ctx.fillStyle = '#ff007f';
+                ctx.shadowBlur = 15; ctx.shadowColor = '#ff007f';
+                ctx.beginPath();
+                ctx.arc(this.x - camera.x, this.y - camera.y + yOffset, this.radius, 0, Math.PI*2);
+                ctx.fill();
+                ctx.fillStyle = '#fff'; ctx.shadowBlur = 0;
+                ctx.font = 'bold 15px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText('＋', this.x - camera.x, this.y - camera.y + yOffset);
+            }
+            ctx.restore();
+        }
+    }
+
+    class Player {
+        constructor(x, y) {
+            this.x = x; this.y = y;
+            this.radius = 12; this.speed = 4.6;
+            this.angle = 0; this.hp = 100;
+            this.fireRate = 24; 
+            this.minFireRate = 5; 
+            this.shootTimer = 0;
+            this.autoAimRange = 400; 
+        }
+        shoot() {
+            bullets.push(new Bullet(this.x, this.y, this.angle));
+            createSparks(this.x + Math.cos(this.angle)*15, this.y + Math.sin(this.angle)*15, '#ffff00');
+            this.shootTimer = this.fireRate;
+        }
+        update() {
+            let moveX = 0; let moveY = 0;
+            if (keys['w'] || keys['arrowup']) moveY = -1;
+            if (keys['s'] || keys['arrowdown']) moveY = 1;
+            if (keys['a'] || keys['arrowleft']) moveX = -1;
+            if (keys['d'] || keys['arrowright']) moveX = 1;
+
+            if (joystickData.active) { moveX = joystickData.moveX; moveY = joystickData.moveY; }
+
+            let mag = Math.hypot(moveX, moveY);
+            if(mag > 0) { moveX = (moveX/mag) * this.speed; moveY = (moveY/mag) * this.speed; }
+
+            let newX = this.x + moveX; let newY = this.y + moveY;
+            if (!isCollidingWithBuilding(newX, this.y, this.radius)) this.x = newX;
+            if (!isCollidingWithBuilding(this.x, newY, this.radius)) this.y = newY;
+
+            let nearestZombie = null;
+            let minDist = this.autoAimRange;
+
+            for (let z of zombies) {
+                if(z.isDead) continue;
+                let d = Math.hypot(z.x - this.x, z.y - this.y);
+                if (d < minDist) { minDist = d; nearestZombie = z; }
+            }
+
+            if (nearestZombie) {
+                this.angle = Math.atan2(nearestZombie.y - this.y, nearestZombie.x - this.x);
+                if (this.shootTimer <= 0) this.shoot();
+            } else if (mag > 0) {
+                this.angle = Math.atan2(moveY, moveX);
+            }
+            if (this.shootTimer > 0) this.shootTimer--;
+        }
+        draw() {
+            ctx.save();
+            ctx.translate(this.x - camera.x, this.y - camera.y);
+            ctx.rotate(this.angle);
+            
+            // Neon Cyan Cyber Hero Body
+            ctx.fillStyle = '#00ffff';
+            ctx.shadowBlur = 10; ctx.shadowColor = '#00ffff';
+            ctx.beginPath(); ctx.arc(0, 0, this.radius, 0, Math.PI * 2); ctx.fill();
+            
+            ctx.fillStyle = '#ffffff'; ctx.fillRect(4, 4, 15, 3); // Chrome Laser Gun
+            ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(2, 0, 6, 0, Math.PI * 2); ctx.fill(); // Helmet
+            ctx.restore();
+        }
+    }
+
+    class Zombie {
+        constructor(x, y) {
+            this.x = x; this.y = y;
+            this.type = (Math.random() < 0.15 && wave >= 2) ? 'TANK' : 'NORMAL';
+            
+            if (this.type === 'TANK') {
+                this.radius = 22;                     
+                this.speed = 1.1 + (wave * 0.1);       
+                this.hp = 50 + (wave * 15);            
+                this.damage = 1.5;                     
+                this.color = '#bd00ff'; // Neon Purple TANK              
+                this.armColor = '#ff007f';
+            } else {
+                this.radius = 12;
+                this.speed = 1.8 + (Math.random() * wave * 0.4);
+                this.hp = 10 + (wave * 5);
+                this.damage = 0.6;                     
+                this.color = '#39ff14'; // Matrix Neon Green standard zombie                
+                this.armColor = '#22aa0f';
+            }
+            if(this.speed > 6.5) this.speed = 6.5; 
+            this.angle = 0; this.isDead = false;
+        }
+        update() {
+            if (this.isDead) return;
+            let dx = player.x - this.x; let dy = player.y - this.y;
+            this.angle = Math.atan2(dy, dx);
+
+            let nextX = this.x + Math.cos(this.angle) * this.speed;
+            let nextY = this.y + Math.sin(this.angle) * this.speed;
+
+            if (!isCollidingWithBuilding(nextX, this.y, this.radius)) this.x = nextX;
+            if (!isCollidingWithBuilding(this.x, nextY, this.radius)) this.y = nextY;
+            
+            if (Math.hypot(this.x - player.x, this.y - player.y) < this.radius + player.radius) {
+                player.hp -= this.damage; 
+                createBlood(player.x, player.y);
+            }
+        }
+        takeDamage() {
+            this.hp -= 15;
+            createBlood(this.x, this.y);
+            if(this.hp <= 0) {
+                this.isDead = true; kills++;
+                let dropChance = Math.random();
+                if (dropChance < 0.06) {
+                    upgradeItems.push(new UpgradeItem(this.x, this.y, 'WEAPON'));
+                } else if (dropChance < 0.12) {
+                    upgradeItems.push(new UpgradeItem(this.x, this.y, 'HEAL'));
+                }
+            }
+        }
+        draw() {
+            if (this.isDead) return;
+            ctx.save();
+            ctx.translate(this.x - camera.x, this.y - camera.y);
+            ctx.rotate(this.angle);
+            
+            ctx.fillStyle = this.color; 
+            ctx.shadowBlur = 6; ctx.shadowColor = this.color;
+            ctx.beginPath(); ctx.arc(0, 0, this.radius, 0, Math.PI * 2); ctx.fill();
+            ctx.shadowBlur = 0;
+            
+            ctx.fillStyle = this.armColor; 
+            if (this.type === 'TANK') {
+                ctx.fillRect(this.radius - 4, -14, 20, 5); 
+                ctx.fillRect(this.radius - 4, 9, 20, 5);
+            } else {
+                ctx.fillRect(5, -9, 12, 3); 
+                ctx.fillRect(5, 6, 12, 3);
+            }
+            ctx.restore();
+        }
+    }
+
+    function spawnEntities() {
+        let maxZombies = 15 + (wave * 5);
+        if(zombies.length < maxZombies) {
+            let dist = Math.max(canvas.width, canvas.height) / 2 + 100; 
+            let angle = Math.random() * Math.PI * 2;
+            let zx = player.x + Math.cos(angle) * dist;
+            let zy = player.y + Math.sin(angle) * dist;
+            if(!isCollidingWithBuilding(zx, zy, 22)) { zombies.push(new Zombie(zx, zy)); }
+        }
+    }
+
+    function updateLogic() {
+        for(let i = bullets.length - 1; i >= 0; i--) {
+            let b = bullets[i]; b.update();
+            if(b.life <= 0 || isCollidingWithBuilding(b.x, b.y, 2)) { bullets.splice(i, 1); continue; }
+            for(let j = zombies.length - 1; j >= 0; j--) {
+                let z = zombies[j];
+                if(!z.isDead && Math.hypot(b.x - z.x, b.y - z.y) < z.radius + 5) {
+                    z.takeDamage(); bullets.splice(i, 1); break; 
+                }
+            }
+        }
+
+        for(let i = upgradeItems.length - 1; i >= 0; i--) {
+            let item = upgradeItems[i];
+            if(Math.hypot(item.x - player.x, item.y - player.y) < player.radius + item.radius) {
+                if (item.type === 'WEAPON') {
+                    player.fireRate = Math.max(player.minFireRate, player.fireRate - 2); 
+                    showUpgradeText('FIRE SPEED UP! ⚡', '#00ffff');
+                    createSparks(player.x, player.y, '#00ffff');
+                } else if (item.type === 'HEAL') {
+                    player.hp = Math.min(100, player.hp + 25); 
+                    showUpgradeText('HP PACK SYNCED! ❤️', '#ff007f');
+                    createSparks(player.x, player.y, '#ff007f');
+                }
+                upgradeItems.splice(i, 1);
+            }
+        }
+
+        for(let i = particles.length - 1; i >= 0; i--) {
+            let p = particles[i]; p.x += p.vx; p.y += p.vy; p.life--;
+            if(p.life <= 0) particles.splice(i, 1);
+        }
+        for(let i = zombies.length - 1; i >= 0; i--) { if(zombies[i].isDead) zombies.splice(i, 1); }
+    }
+
+    function formatTime(seconds) {
+        let m = Math.floor(seconds / 60).toString().padStart(2, '0');
+        let s = (seconds % 60).toString().padStart(2, '0');
+        return `${m}:${s}`;
+    }
+
+    function drawMinimap() {
+        mctx.fillStyle = '#0c0214'; mctx.fillRect(0, 0, 130, 130);
+        let scale = 0.05; mctx.save(); mctx.translate(65, 65); 
+        
+        mctx.fillStyle = '#00ffff'; mctx.beginPath(); mctx.arc(0, 0, 4, 0, Math.PI*2); mctx.fill();
+
+        upgradeItems.forEach(item => {
+            let dx = (item.x - player.x) * scale; let dy = (item.y - player.y) * scale;
+            if(Math.hypot(dx, dy) < 60) {
+                mctx.fillStyle = item.type === 'WEAPON' ? '#00ffff' : '#ff007f';
+                mctx.beginPath(); mctx.arc(dx, dy, 3, 0, Math.PI*2); mctx.fill();
+            }
+        });
+
+        zombies.forEach(z => {
+            let dx = (z.x - player.x) * scale; let dy = (z.y - player.y) * scale;
+            if(Math.hypot(dx, dy) < 60) {
+                mctx.fillStyle = z.type === 'TANK' ? '#bd00ff' : '#39ff14'; 
+                mctx.beginPath(); mctx.arc(dx, dy, z.type === 'TANK' ? 4 : 2.5, 0, Math.PI*2); mctx.fill();
+            }
+        });
+        mctx.restore();
+    }
+
+    function updateUI() {
+        survivalTime = Math.floor((Date.now() - startTime) / 1000);
+        let timeString = formatTime(survivalTime);
+
+        document.getElementById('time-val').innerText = timeString;
+        document.getElementById('score-val').innerText = kills;
+        document.getElementById('hp-val').innerText = Math.max(0, Math.floor(player.hp));
+        
+        if (player.hp <= 0) gameOver(timeString);
+
+        let newWave = 1 + Math.floor(kills / 25);
+        if(newWave > wave) {
+            wave = newWave;
+            document.getElementById('wave-val').innerText = wave;
+            let wb = document.getElementById('box-wave');
+            wb.style.transform = 'scale(1.2)';
+            setTimeout(() => { wb.style.transform = 'scale(1)'; }, 400);
+        }
+    }
+
+    function gameOver(timeString) {
+        isGameOver = true;
+        document.getElementById('game-over').style.display = 'block';
+        document.getElementById('final-time').innerText = timeString;
+        document.getElementById('final-wave').innerText = wave;
+        document.getElementById('final-score').innerText = kills;
+    }
+
+    function resetGame() {
+        player = new Player(blockSize + roadWidth/2, blockSize + roadWidth/2);
+        zombies = []; bullets = []; particles = []; upgradeItems = [];
+        kills = 0; wave = 1; isGameOver = false; keys = {}; resetJoystick();
+        
+        document.getElementById('wave-val').innerText = wave;
+        document.getElementById('game-over').style.display = 'none';
+        
+        if (gameStarted) { startTime = Date.now(); gameLoop(); }
+    }
+
+    function gameLoop() {
+        if(isGameOver || !gameStarted) return;
+        
+        camera.x = player.x - canvas.width / 2;
+        camera.y = player.y - canvas.height / 2;
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        drawInfiniteCity();
+        
+        player.update();
+        zombies.forEach(z => z.update());
+        updateLogic();
+        spawnEntities();
+
+        upgradeItems.forEach(i => i.draw());
+        
+        particles.forEach(p => {
+            ctx.globalAlpha = p.life / 25;
+            ctx.fillStyle = p.color;
+            ctx.beginPath(); ctx.arc(p.x - camera.x, p.y - camera.y, p.size, 0, Math.PI*2); ctx.fill();
+            ctx.globalAlpha = 1;
+        });
+
+        bullets.forEach(b => b.draw());
+        zombies.forEach(z => z.draw());
+        player.draw();
+        
+        drawMinimap();
+        updateUI();
+
+        if(!isGameOver && gameStarted) gameLoopReq = requestAnimationFrame(gameLoop);
+    }
+
+    // Initialize View Without Running Loop Prematurely
+    player = new Player(blockSize + roadWidth/2, blockSize + roadWidth/2);
+    camera.x = player.x - canvas.width / 2;
+    camera.y = player.y - canvas.height / 2;
+    drawInfiniteCity();
+    player.draw();
+</script>
+</body>
+</html>
